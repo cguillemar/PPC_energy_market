@@ -4,28 +4,18 @@ import threading
 import random
 import sysv_ipc
 
-
-
 class Meteo(Process):
-
-    def __init__(self,date,ensoleilement,temperature,vent):
-        self.date=[]
-        self.temperature
+    def __init__(self,date,temperature):
+        self.date=date
+        self.temperature=temperature
 
     def __lectureFichier__(self):
         #on lit dans un fichier texte contenant des temperatures moy en fonction des jours
 
     def run(self):
-        #creation memoire partagee des variables (meteo en mode ecriture):
-        sharedMem=sysv_ipc.MessageQueue(none, sysv_ipc.IPC_CREAT)
-
-
-
-
+        #
 class Maison(Process):
-
     def __init__(self,consume,product,etat):
-
         self.consume
         self.product
         self.energie
@@ -58,37 +48,49 @@ class Maison(Process):
         threadProd.start()
         threadProd.join()
 
-
-
-
-
+#process Marche gere toutes les transactions entre les maisons ou entre maisons et Marché
 class Marche(Process):
 
-    def __init__(self,monPrixInitial,pMaison):
+    def __init__(self,monPrixInitial,pMaison,etat):
 
         #evolution du prix du marche en fonction du temps pour tracer une courbe
         self.prix=[]
         self.pMaison=pMaison
         prix.append(monPrixInitial)
+        if etat==0:#communiste mode
+            __communisteMode__()
+        else:
+            __capitalisteMode__()
 
-    def __calculPrix__(self):
-        i=0
-        while True:
-            prix.append(gamma*prix[i]+sommeExt)
-            i+=1
+    def __communisteMode__(self,pMaison):
+    #on créé un thread=chaque thread communique en Pipes avec une maison pour récupérer les valeurs de l'energie et la stocke dans un tableau commun
+    #on compare les valeurs
+    #on créé un thread=chaque thread communique en Pipes avec une maison pour ajuster l'energie
+    #s'il manque de l'energie ou s'il y a un surplus on met a jour le prix du marche
+
+    def __capitalisteMode__(self,pMaison):
+    # on créé un thread=chaque thread communique en Pipes avec une maison pour récupérer les valeurs de l'energie et la stocke dans un tableau commun
+    # on met des seuils d'énergie si la demande est supérieur à un certain seuil on augmente le prix
+    #Si la demande est inférieur à un certain seuil on baisse le prix
+    # on créé un thread=chaque thread communique en Pipes avec une maison pour ajuster l'energie
+    #en fonction du nouveau prix du marche(et donc en fonction de ses possibilités pour gérer la demande
 
     def __communicationAvecFils__(self):
-        #on recupere les signaux des evenements ext
-
-    def __communicationAvecMaisons__(self,prixActuel):
-        #on cree un thread qui communique avec les maisons
-
+    #on recupere les donnees des evenements ext par signaux
 
     def run(self):
         __calculPrix__(#arguments)
         #creation process fils Evenement Ext
         pEvenementExt=EvenExt(#arguments)
         prixActuel=prix[-1]
+
+    def __calculPrix__(self):
+        #prix a l indice n+1 depend du prix a l indice n
+        #formule donnee dans le sujet
+        prix.append(gamma * prix[-1] + sommeExt)
+
+    def Tracerlacourbe(self,prix,date):
+        #On plot la courbe
 
 class EvenExt(Process):
 
@@ -97,37 +99,30 @@ class EvenExt(Process):
         self.u #apparition d'un evenement (0 ou 1)
         #evenements est un dictionnaire d'évènements ayant une valeur pouvant modifier le prix du marché
         self.evenements
+        self.sommeExt=0
 
-    def run(self):
-        #do something
+    def run(self,beta):
+       #dosomething
 
+    def gestionevenements(self):
+        #tirage aléatoire des évenements dans le dictionnaire evenements
+        #on les met dans la liste eve
+        eve=[]
+
+        for i in eve :
+            sommeExt=sommeExt+i
+
+        sommeExt=beta*sommeExt
+
+        #communication de sommeExt par pipes puis sommeEXt=0
 
 # main programme
-
-def __communisteMode__(pMaison):
-    # faire communication interprocess entre Maisons
-    # Si prod>conso on donne une partie de energie
-    # Si conso>prod on recoit une partie de energie
-
-def __capitalisteMode__(pMaison):
-    # faire communication avec Process Marche
-    # Si prod>conso on vend au marche de l'energie
-    # Si conso>prod on achete au marche de l'energie
-
-
 if __name__=='__main__':
 
     #alpha coefficient facteurs météorologiques
     alpha=constante
     #beta coefficient facteurs évènements extérieurs
     beta=constante
-    # etat= "communiste(0)" et "capitaliste(1)" definie aleatoirement
-    etat=random.randint(0,1)
-
-
-
-
-
 
     #generation de N process maisons aleatoire
     N=random.randint(5,100)
@@ -137,15 +132,14 @@ if __name__=='__main__':
         pMaison.start()
 
     #generation de 1 process marche
-    pMarche=Marche(#arguments)
+    # etat= "communiste(0)" et "capitaliste(1)" definie aleatoirement
+    etat = random.randint(0, 1)
+    pMarche=Marche(prixInitial du marche,pMaison,etat)
     pMarche.start()
 
     #creation process Meteo
-    pMeteo=Meteo(#arguments)
-
-    if etat == 0:  # communiste mode
-        threadCommuniste = threading.Thread(target=__communisteMode__, args=(pMaison,))
-        threadCommuniste.start()
-    else:  # capitaliste mode
-        threadCapitaliste = threading.Thread(target=__capitalisteMode__, args=(pMaison,))
-        threadCapitaliste.start()
+    #creation des variables en memoire partagee
+    with Manager() as manager:
+        date=manager.list(0)
+        temperature=manager.list(0)
+    pMeteo=Meteo(date,temperature)
