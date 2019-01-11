@@ -1,5 +1,5 @@
 
-from multiprocessing import Process, Value, Array, Pool
+from multiprocessing import Process, Value, Array, Pool, Condition
 from multiprocessing import Queue
 import threading
 from random import *
@@ -22,7 +22,7 @@ def meteo(listTemp,N):
 
 
 class Marche(Process):
-    def __init__(self,vPrix,tabMarche,listTemp,portefeuille,flagFinishTurn,monJour):
+    def __init__(self,vPrix,tabMarche,listTemp,portefeuille,flagFinishTurn,monJour,synCondition):
         super().__init__()
         self.vPrix=vPrix
         self.tabMarche=tabMarche
@@ -30,13 +30,15 @@ class Marche(Process):
         self.portefeuille=portefeuille
         self.flagFinishTurn=flagFinishTurn
         self.monJour=monJour
+        self.synCondition=synCondition
 
     def run(self):
         print("creation marche")
         while self.monJour.value!=299:
 
             #calcul du nouveau prix pour le jour suivant
-            self.vPrix[self.monJour.value+1]=(0.99*self.vPrix[self.monJour.value]+Marche.prix(self.listTemp[self.monJour.value]))
+            self.vPrix[self.monJour.value+1]=0.5
+            #self.vPrix[self.monJour.value+1]=(0.99*self.vPrix[self.monJour.value]+Marche.prix(self.listTemp[self.monJour.value]))
             print("nouveau prix",self.vPrix[self.monJour.value+1])
             while Marche.__test__(self)!=True:
                     if self.tabMarche.empty()==False:
@@ -46,7 +48,11 @@ class Marche(Process):
                         threadAchatMarche.join()
             #maj du jour apres avoir verifie que les 10 process maisons ont finie leur tour
             self.monJour.value+=1
+            self.synCondition.acquire()
+            self.synCondition.notify_all()
+            self.synCondition.release()
             print("nous sommes jour",self.monJour.value)
+            print(self.portefeuille[:])
 
     def __test__(self):
         for i in range(10):
@@ -60,7 +66,7 @@ class Marche(Process):
     def __achat_marche__(self,i,valeur):
         #possible no need for lock : its a shared array memory (already implemented?
             self.portefeuille[i]=self.portefeuille[i]-valeur*self.vPrix[self.monJour.value]
-            print("portefeuille",i,"montant",self.portefeuille[i])
+            #print("portefeuille",i,"montant",self.portefeuille[i])
 
 
 
@@ -90,7 +96,7 @@ class Marche(Process):
 class Maison(Process):
 
     #__init__: constructeur, initialise tout les parametres
-    def __init__(self,numMaison,tabProduction,tabMarche,listTemp,portefeuille,flagFinishTurn,monJour):
+    def __init__(self,numMaison,tabProduction,tabMarche,listTemp,portefeuille,flagFinishTurn,monJour,synCondition):
         #penser a mettre le super sinon ca marche pas
         super().__init__()
         #valeurs arbitraires
@@ -107,13 +113,21 @@ class Maison(Process):
         self.tabMarche=tabMarche
         self.flagFinishTurn=flagFinishTurn
         self.monJour=monJour
+        self.synCondition=synCondition
+
+
 
 
     #run definie ce que fait le process
     def run(self):
-        print("creation maison",self.numMaison)
+        #print("creation maison",self.numMaison)
+        #condition pour changement de jour quand marche a maj monJour
+        #n=0
         while self.monJour.value!=299:
+            #n+=1
+            #print(self.numMaison,"refait une boucle nombre",n)
             self.flagFinishTurn[self.numMaison]=False
+            #on attend que tout les process maisons soient synch
             #creation d'un thread (un thread par maison) qui va produire
             threadProduire =threading.Thread(target=Maison.__produire__, args=(self,))
             threadProduire.start()
@@ -132,6 +146,15 @@ class Maison(Process):
                     threadAcheter.join()
             #avertie qu'il a fini son jour
             self.flagFinishTurn[self.numMaison]=True
+            self.synCondition.acquire()
+            self.synCondition.wait()
+            self.synCondition.release()
+
+
+
+
+
+
 
 
 
@@ -143,28 +166,27 @@ class Maison(Process):
         coefmaison=randint(5,10)
         self.production=(1-taux)*100+coefmaison
         self.consommation=taux*100+coefmaison
-        print("maison",self.numMaison,"produit",self.production,"consomme",self.consommation)
+        #print("maison",self.numMaison,"produit",self.production,"consomme",self.consommation)
     def __donnerMaison__(self):
-        print("on donne enfin")
+        #print("on donne enfin")
         #verifie si la queue est pleine
         if self.tabProduction.full() == False:
             #donne surplus de production uniquement
-            self.tabProduction.put(self.production-self.condition)
-        self.production=self.condition
+            self.tabProduction.put(self.production-self.consommation)
+        self.production=self.consommation
 
     #thread achete de l'energie sur le marche ou entre les maisons disponibles
     def __acheter__(self):
         #verifie si queue vide
         if self.tabProduction.empty()==False:
-
             #on augmente valeur conso en fonction de la valeur de production piochee
             self.production+=self.tabProduction.get()
-
         else:
             #cas ou pas de prod dispo entre les maisons on achete a marche qui fait l equilibre
             tupleSend=(self.numMaison,self.consommation-self.production)
             self.tabMarche.put(tupleSend)
             self.production=self.consommation
+            #print("apres marche","produit",self.production,"consomme",self.consommation)
 
 if __name__=="__main__":
 
@@ -176,23 +198,22 @@ if __name__=="__main__":
     pMeteo.start()
     pMeteo.join()
     monJour=Value('i',0)
-
+    synCondition = Condition()
     vPrix=Array('d',range(N))      #prix gere par marche
     vPrix[0]=2 #prix initial
     flagFinishTurn=Array('i',[False,False,False,False,False,False,False,False,False,False]) #se met a True chaque jour quand maison a finie ses echanges pour prevenir marche
     tabProduction = Queue()
     tabMarche = Queue()
-    portefeuille=Array('d',[50,50,50,50,50,50,50,50,50,50])   #creation d'un portefeuille pour les 10 maisons process
-
+    portefeuille=Array('d',[5000,5000,5000,5000,5000,5000,5000,5000,5000,5000])   #creation d'un portefeuille pour les 10 maisons process
     # On lance le marché
-    pMarche=Marche(vPrix,tabMarche,listTemp,portefeuille,flagFinishTurn,monJour)
+    pMarche=Marche(vPrix,tabMarche,listTemp,portefeuille,flagFinishTurn,monJour,synCondition)
     pMarche.start()
-
     # On lance les process maisons
     pTotal = []  # Liste des process maisons+Marche en marche
     nMaison = 10  # nombre de maisons
+
     for numMaison in range(nMaison):
-        maison = Maison(numMaison,tabProduction,tabMarche,listTemp,portefeuille,flagFinishTurn,monJour)
+        maison = Maison(numMaison,tabProduction,tabMarche,listTemp,portefeuille,flagFinishTurn,monJour,synCondition)
         pTotal.append(maison)
         maison.start()
 
