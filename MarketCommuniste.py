@@ -47,14 +47,15 @@ class Marche(Process):
 
             #print("nouveau prix", self.vPrix[self.monJour.value + 1])
             #print("nous sommes jour", self.monJour.value)
-            while Marche.__test__(self) != True and self.tabMarche.empty()==False:
-                indice, valeur = self.tabMarche.get()
-                nrj=nrj+valeur
-                #print(indice,valeur)
-                threadAchatMarche = threading.Thread(target=Marche.__achat_marche__, args=(self, indice, valeur))
-                threadAchatMarche.start()
-                threadAchatMarche.join()
-            # maj du jour apres avoir verifie que les 10 process maisons ont finie leur tour
+            while Marche.__test__(self) != True:
+                while self.tabMarche.empty()==False:
+                    indice, valeur = self.tabMarche.get()
+                    #print(indice,valeur,"jour",self.monJour.value)
+                    nrj=nrj+valeur
+                    threadAchatMarche = threading.Thread(target=Marche.__achat_marche__, args=(self, indice, valeur))
+                    threadAchatMarche.start()
+                    threadAchatMarche.join()
+                # maj du jour apres avoir verifie que les 10 process maisons ont finie leur tour
 
             self.vPrix[self.monJour.value + 1] = (0.99 * self.vPrix[self.monJour.value] + Marche.prixCapitaliste(nrj))
             self.monJour.value += 1
@@ -64,11 +65,6 @@ class Marche(Process):
                 self.flagFinishTurn[i] = False
             self.synCondition.notify_all()
             self.synCondition.release()
-            while self.tabMarche.empty()==False:
-                val=self.tabMarche.get()
-            print(self.portefeuille[:])
-
-
             self.suiviMaison[self.monJour.value] = self.portefeuille[-1]
 
     def __test__(self):
@@ -143,7 +139,7 @@ class Maison(Process):
         # print("creation maison",self.numMaison)
         # condition pour changement de jour quand marche a maj monJour
         # n=0
-
+        print("premier jour",self.monJour.value)
         while self.monJour.value != 365:
             #print("Maison",self.flagFinishTurn[:],"num", self.numMaison)
             # n+=1
@@ -154,16 +150,18 @@ class Maison(Process):
             threadProduire = threading.Thread(target=Maison.__produire__, args=(self,))
             threadProduire.start()
             threadProduire.join()
-
+            if self.monJour.value<=30:
+                print(self.monJour.value,"prod",self.production,"conso",self.consommation)
             if self.etatSimulation==0: #on entre dans le mode de gestion communiste
-                    if self.production > self.consommation:
-                        threadDonnerMaison = threading.Thread(target=Maison.__donnerMaison__, args=(self,))
-                        threadDonnerMaison.start()
-                        threadDonnerMaison.join()
-                    else:
-                        threadAcheter = threading.Thread(target=Maison.__acheterCommuniste__, args=(self,))
-                        threadAcheter.start()
-                        threadAcheter.join()
+                if self.production > self.consommation:
+                    threadDonnerMaison = threading.Thread(target=Maison.__donnerMaison__, args=(self,))
+                    threadDonnerMaison.start()
+                    threadDonnerMaison.join()
+                else:
+
+                    threadAcheter = threading.Thread(target=Maison.__acheterCommuniste__, args=(self,))
+                    threadAcheter.start()
+                    threadAcheter.join()
 
             else: #on entre dans le mode de gestion capitaliste
                 threadEchangeMarche=threading.Thread(target=Maison.__echangeMarche__,args=(self,))
@@ -199,7 +197,7 @@ class Maison(Process):
 
     # thread achete de l'energie sur le marche ou entre les maisons disponibles
     def __acheterCommuniste__(self):
-        # verifie si queue vide
+
         if self.tabProduction.empty() == False:
             with self.lockProduction:
                 cagnotteProdMaisons=self.tabProduction.get()
@@ -211,7 +209,7 @@ class Maison(Process):
                     self.production+=cagnotteProdMaisons
                     self.tabProduction.put(0)
         if self.production<self.consommation:
-            tupleSend = (self.numMaison, self.production - self.consommation)
+            tupleSend = (self.numMaison, self.production-self.consommation)
             self.tabMarche.put(tupleSend)
 
             # print("apres marche","produit",self.production,"consomme",self.consommation)
@@ -221,7 +219,7 @@ class Maison(Process):
         self.tabMarche.put(tupleSend)
 
 if __name__ == "__main__":
-    etatSimulation=1 #0 vaut communiste 1 vaut capitaliste
+    etatSimulation=0 #0 vaut communiste 1 vaut capitaliste
     N = 366  # Nombre de jours de la simulation
     listTemp = Array('d', range(N))  # Liste des températures
 
