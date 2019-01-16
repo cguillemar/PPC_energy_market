@@ -1,4 +1,4 @@
-from multiprocessing import Process, Value, Array, Pool, Condition,Semaphore
+from multiprocessing import Process, Value, Array, Pool, Condition,Semaphore,Pipe
 from multiprocessing import Queue
 import threading
 import random
@@ -38,8 +38,14 @@ class Marche(Process):
 
     def run(self):
         print("creation marche")
+        #instanciation pipes avec evenementExt process fils
+        parent_conn,child_conn = Pipe()
+        pEvenementExt=Process(target=evenementExt,args=(child_conn,))
+        pEvenementExt.start()
         while self.monJour.value != 365:
-
+            parent_conn.send(self.monJour.value)
+            dayEvent=parent_conn.recv();
+            print(dayEvent)
             nrj=0
 
             # calcul du nouveau prix pour le jour suivant
@@ -57,7 +63,7 @@ class Marche(Process):
                     threadAchatMarche.join()
                 # maj du jour apres avoir verifie que les 10 process maisons ont finie leur tour
 
-            self.vPrix[self.monJour.value + 1] = (0.99 * self.vPrix[self.monJour.value] + Marche.prixCapitaliste(nrj))
+            self.vPrix[self.monJour.value + 1] = 0.99 * self.vPrix[self.monJour.value] + Marche.prixCapitaliste(nrj)+dayEvent
             self.monJour.value += 1
             #print("marche",self.monJour.value)
             self.synCondition.acquire()
@@ -66,6 +72,7 @@ class Marche(Process):
             self.synCondition.notify_all()
             self.synCondition.release()
             self.suiviMaison[self.monJour.value] = self.portefeuille[-1]
+        pEvenementExt.terminate()
 
     def __test__(self):
         for i in range(10):
@@ -138,8 +145,7 @@ class Maison(Process):
     def run(self):
         # print("creation maison",self.numMaison)
         # condition pour changement de jour quand marche a maj monJour
-        # n=0
-        print("premier jour",self.monJour.value)
+
         while self.monJour.value != 365:
             #print("Maison",self.flagFinishTurn[:],"num", self.numMaison)
             # n+=1
@@ -150,8 +156,6 @@ class Maison(Process):
             threadProduire = threading.Thread(target=Maison.__produire__, args=(self,))
             threadProduire.start()
             threadProduire.join()
-            if self.monJour.value<=30:
-                print(self.monJour.value,"prod",self.production,"conso",self.consommation)
             if self.etatSimulation==0: #on entre dans le mode de gestion communiste
                 if self.production > self.consommation:
                     threadDonnerMaison = threading.Thread(target=Maison.__donnerMaison__, args=(self,))
@@ -217,6 +221,24 @@ class Maison(Process):
         #marche met a jour le portefeuille
         tupleSend = (self.numMaison, self.production-self.consommation)
         self.tabMarche.put(tupleSend)
+
+def evenementExt(child_conn):
+    #print("je suis un evenementExt")
+    listEvenements=[0]*250+[random.uniform(0,0.04)]*50+[random.uniform(-0.02,0)]*50
+    monJour=child_conn.recv();
+    while monJour!=365:
+        #generation aleatoire d un bonus ou d un malus
+        randomValue=random.randint(0,1000)
+        if randomValue<5:
+            #evenement extraordinaire: croissance exceptionnelle ou crash boursier
+            child_conn.send(-1+random.randint(0,1)*2)
+        elif randomValue<900 and randomValue>100:
+            #evenement extraordinaire: croissance exceptionnelle
+            child_conn.send(0)
+        else:
+            child_conn.send(random.uniform(-0.02,0.02))
+        monJour=child_conn.recv();
+
 
 if __name__ == "__main__":
     etatSimulation=0 #0 vaut communiste 1 vaut capitaliste
