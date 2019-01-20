@@ -63,6 +63,7 @@ class Marche(Process):
                 while self.tabMarche.empty()==False:
                     #print(self.monJour.value)
                     indice, valeur = self.tabMarche.get()
+
                     #print(indice,valeur,"jour",self.monJour.value)
                     nrj=nrj+valeur
                     threadAchatMarche = threading.Thread(target=Marche.__achat_marche__, args=(self, indice, valeur))
@@ -210,9 +211,11 @@ class Maison(Process):
     # thread produire de l'energie
     def __produire__(self):
         taux = abs(self.listTemp[self.monJour.value] - 20) / 20  # Nrj max pour 20°
-        coefmaison = random.randint(10, 50)
-        self.production = (1 - taux) * 100 + coefmaison
-        self.consommation = taux * 100 + coefmaison
+        coefproduction = random.randint(10, 80)
+        coefconso = random.randint(10, 80)
+        
+        self.production = (1 - taux) * 100 + coefproduction
+        self.consommation = taux * 100 + coefconso
         #print("maison",self.numMaison,"produit",self.production,"consomme",self.consommation)
 
     def __donnerMaison__(self):
@@ -230,7 +233,7 @@ class Maison(Process):
     # thread achete de l'energie sur le marche ou entre les maisons disponibles
     def __acheterCommuniste__(self):
 
-        print(self.numMaison,self.production,self.consommation)
+        #print(self.numMaison,self.production,self.consommation)
 
         if self.tabProduction.empty() == False:
             with self.lockProduction:
@@ -245,7 +248,10 @@ class Maison(Process):
                     self.tabProduction.put(0)
 
         if self.production<self.consommation:
+            print("échange",self.numMaison,self.production,self.consommation)
+
             tupleSend = (self.numMaison, self.production-self.consommation)
+            print(tupleSend)
             self.tabMarche.put(tupleSend)
             
 
@@ -254,7 +260,10 @@ class Maison(Process):
             # print("apres marche","produit",self.production,"consomme",self.consommation)
     def __echangeMarche__(self):
         #marche met a jour le portefeuille
+        print("échange",self.numMaison,self.production,self.consommation)
+       
         tupleSend = (self.numMaison, self.production-self.consommation)
+
         self.tabMarche.put(tupleSend)
         
 
