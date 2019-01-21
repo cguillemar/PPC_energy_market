@@ -74,6 +74,8 @@ class Marche(Process):
             #maj du prix
             self.vPrix[self.monJour.value + 1] = (0.99 * self.vPrix[self.monJour.value] + Marche.prix(nrj) + dayEvent)
             
+            time.sleep(0.05) #Pause permettant de voir l'évolution dynmique du prix
+
             #ecriture de la valeur du prix et du jour en cours dans Courbes.txt
             fichier = open("Courbes.txt", "a")
             fichier.write(str(self.vPrix[self.monJour.value] + 3.5) + "," + str(self.monJour.value) + "\n")
@@ -294,7 +296,7 @@ def evenementExt(child_conn):
 #main programm
 if __name__ == "__main__":
 
-    print(" !! Ne pas oublier de créer les fichiers textes : Courbes.txt nrj.txt")
+    print("\n"+" !! Ne pas oublier de créer les fichiers textes : Courbes.txt nrj.txt")
     print(" ### ------------ SIMULATION --------------- ###")
     
      # etatSimulation : 0 vaut communiste 1 vaut capitaliste
@@ -380,7 +382,7 @@ if __name__ == "__main__":
         plt.ylabel('Température en °')
 
         plt.subplot(2, 2, 4)
-        plt.title("Evolution du portefeuille de maison 1 en fonction du jour")
+        plt.title("Evolution du portefeuille de 2 maisons en fonction du jour")
         plt.plot(M, suiviMaison, label="Maison a")
         plt.plot(M, suiviMaison2, label="Maison b")
         plt.xlabel('jours')
