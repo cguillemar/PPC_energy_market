@@ -74,7 +74,7 @@ class Marche(Process):
             #maj du prix
             self.vPrix[self.monJour.value + 1] = (0.99 * self.vPrix[self.monJour.value] + Marche.prix(nrj) + dayEvent)
             
-            time.sleep(0.05) #Pause permettant de voir l'évolution dynmique du prix
+            #time.sleep(0.05) #Pause permettant de voir l'évolution dynmique du prix
 
             #ecriture de la valeur du prix et du jour en cours dans Courbes.txt
             fichier = open("Courbes.txt", "a")
