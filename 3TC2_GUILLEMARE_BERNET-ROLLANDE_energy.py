@@ -1,3 +1,5 @@
+#Auteurs: Guillemare Clément, Bernet-Rollande Agathe
+
 from multiprocessing import Process, Value, Array, Pool, Condition, Semaphore, Pipe,Lock
 from multiprocessing import Queue
 import threading
